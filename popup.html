@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <title>Canvas Seksjonsmarkering</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: LatoWeb, Lato, 'Helvetica Neue', sans-serif;
+      font-size: 13px;
+      color: #2d3b45;
+      background: #fff;
+      width: 270px;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: #0770a3;
+      color: #fff;
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-title { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+    .header-sub   { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+    .toggle-row   { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+    .toggle-row input { cursor: pointer; }
+
+    /* ─── Auto-status-kort ─── */
+    .auto-card {
+      margin: 12px 14px 0;
+      padding: 9px 11px;
+      border-radius: 6px;
+      border-left: 4px solid #ddd;
+      background: #f7f9fb;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      transition: border-color 0.3s;
+    }
+    .auto-dot {
+      width: 14px; height: 14px;
+      border-radius: 3px; flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,0.12);
+      transition: background 0.3s;
+    }
+    .auto-text  { line-height: 1.35; }
+    .auto-label { font-size: 10px; font-weight: 700; color: #6b7789;
+                  text-transform: uppercase; letter-spacing: 0.05em; }
+    .auto-name  { font-size: 13px; color: #2d3b45; font-weight: 600; }
+    .auto-name.loading { color: #aaa; font-weight: 400; font-style: italic; }
+
+    /* ─── Body ─── */
+    .body {
+      padding: 12px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 10px; font-weight: 700; color: #6b7789;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #c7cdd1;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #2d3b45;
+      background: #fff;
+      cursor: pointer;
+    }
+    select:focus    { outline: 2px solid #0770a3; border-color: transparent; }
+    select:disabled { background: #f5f5f5; cursor: not-allowed; color: #999; }
+
+    .reset-link {
+      font-size: 11px; color: #0770a3; cursor: pointer;
+      text-decoration: underline; background: none;
+      border: none; padding: 0; display: none;
+    }
+    .reset-link.visible { display: inline; }
+
+    /* ─── Fargeswatches ─── */
+    .swatch-group-label {
+      font-size: 10px;
+      color: #9aa5b1;
+      margin-bottom: 2px;
+      margin-top: 4px;
+    }
+    .swatch-group-label:first-child { margin-top: 0; }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s, border-color 0.15s;
+      position: relative;
+      /* Outline hjelper de nesten hvite å synes mot bakgrunnen */
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.07);
+    }
+    .swatch:hover  { transform: scale(1.13); }
+    .swatch.active {
+      border-color: #2d3b45;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.07);
+    }
+    .swatch.active::after {
+      content: '✓';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: rgba(0,0,0,0.35);
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      border-top: 1px solid #e8e8e8;
+      padding: 9px 14px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn-refresh {
+      font-size: 11px; color: #0770a3; background: none;
+      border: 1px solid #0770a3; border-radius: 4px;
+      padding: 4px 10px; cursor: pointer;
+    }
+    .btn-refresh:hover { background: #e8f4fb; }
+
+    .disabled-overlay { opacity: 0.4; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <div class="header-title">Seksjonsmarkering</div>
+      <div class="header-sub">Dialograpport · Canvas</div>
+    </div>
+    <div class="toggle-row">
+      <span id="toggle-text">På</span>
+      <input type="checkbox" id="toggle-enabled" checked />
+    </div>
+  </div>
+
+  <div class="auto-card" id="auto-card">
+    <div class="auto-dot" id="auto-dot"></div>
+    <div class="auto-text">
+      <div class="auto-label">Din seksjon (automatisk)</div>
+      <div class="auto-name loading" id="auto-name">Henter…</div>
+    </div>
+  </div>
+
+  <div class="body" id="settings-body">
+
+    <div class="field">
+      <label>Vis annen seksjon</label>
+      <select id="section-select">
+        <option value="">— Laster… —</option>
+      </select>
+      <button class="reset-link" id="reset-override">↩ Tilbake til min seksjon</button>
+    </div>
+
+    <div class="field">
+      <label>Markeringsfarge</label>
+
+      <div class="swatch-group-label">Duse</div>
+      <div class="swatches" id="swatches-normal"></div>
+
+      <div class="swatch-group-label">Knapt synlig</div>
+      <div class="swatches" id="swatches-subtle"></div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="btn-refresh" id="btn-refresh">↺ Oppdater</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
