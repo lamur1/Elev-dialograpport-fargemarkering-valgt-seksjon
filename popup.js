@@ -1,6 +1,5 @@
 'use strict';
 
-// ─── Fargepaletten ────────────────────────────────────────────────────────────
 const SWATCHES_NORMAL = [
   { hex: '#ddeeff', label: 'Duggblå'      },
   { hex: '#ddf2e8', label: 'Lysgrønn'     },
@@ -22,15 +21,20 @@ const SWATCHES_SUBTLE = [
 ];
 
 const DEFAULT_COLOR = SWATCHES_NORMAL[0].hex;
-const DEFAULTS = { enabled: true, overrideSectionId: null, highlightColor: DEFAULT_COLOR };
+const DEFAULTS = {
+  enabled:           true,
+  overrideSectionId: null,
+  highlightColor:    DEFAULT_COLOR,
+  autoSort:          true,
+};
 
-// ─── Element-referanser ───────────────────────────────────────────────────────
 const toggleEl       = document.getElementById('toggle-enabled');
 const toggleText     = document.getElementById('toggle-text');
+const autoSortEl     = document.getElementById('toggle-autosort');
 const settingsEl     = document.getElementById('settings-body');
 const autoCard       = document.getElementById('auto-card');
 const autoDot        = document.getElementById('auto-dot');
-const autoName       = document.getElementById('auto-name');
+const autoNameEl     = document.getElementById('auto-name');
 const selectEl       = document.getElementById('section-select');
 const resetBtn       = document.getElementById('reset-override');
 const refreshBtn     = document.getElementById('btn-refresh');
@@ -39,9 +43,8 @@ const swatchesSubtle = document.getElementById('swatches-subtle');
 
 let currentOverride = null;
 let currentColor    = DEFAULT_COLOR;
-let sectionsLoaded  = false;
 
-// ─── Bygg fargeswatch-grids ───────────────────────────────────────────────────
+// ─── Bygg swatches ───────────────────────────────────────────────────────────
 function buildSwatches(container, list) {
   list.forEach(({ hex, label }) => {
     const btn = document.createElement('button');
@@ -66,81 +69,68 @@ function selectColor(hex) {
   save({ highlightColor: hex });
 }
 
-// ─── Last inn innstillinger og sett opp lytter ───────────────────────────────
+// ─── Last innstillinger ──────────────────────────────────────────────────────
 chrome.storage.local.get(DEFAULTS, (cfg) => {
-  const enabled = cfg.enabled !== false;
-  toggleEl.checked       = enabled;
-  toggleText.textContent = enabled ? 'På' : 'Av';
-  setBodyEnabled(enabled);
-
+  toggleEl.checked       = cfg.enabled !== false;
+  toggleText.textContent = cfg.enabled !== false ? 'På' : 'Av';
+  autoSortEl.checked     = cfg.autoSort !== false;
+  setBodyEnabled(cfg.enabled !== false);
   currentOverride = cfg.overrideSectionId || null;
   selectColor(cfg.highlightColor || DEFAULT_COLOR);
-
-  // Forsøk å hente seksjonsdata med én gang
-  tryLoadPopupData(cfg.overrideSectionId);
+  askContentScript(cfg.overrideSectionId);
 });
 
-// Lytt på storage-endringer: content-scriptet publiserer cds_popup når det er
-// ferdig. Da oppdaterer vi dropdown uansett om popup var åpen allerede.
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.cds_popup && !sectionsLoaded) {
-    const data = changes.cds_popup.newValue;
-    if (data) applyPopupData(data, currentOverride);
-  }
-  // Oppdater farge live dersom endringen kom fra en annen kilde
-  if (changes.highlightColor) {
-    selectColor(changes.highlightColor.newValue);
-  }
-});
-
-// ─── Hent popup-data (en gang; resten håndteres av storage-lytteren) ─────────
-function tryLoadPopupData(overrideId) {
-  chrome.storage.local.get('cds_popup', (r) => {
-    if (r.cds_popup && r.cds_popup.sections && r.cds_popup.sections.length > 0) {
-      applyPopupData(r.cds_popup, overrideId);
-    } else {
-      // Data ikke klar ennå – vis ventemodus, storage-lytteren tar over
-      autoName.textContent = 'Åpne Dialograpport-siden…';
-      autoName.className   = 'auto-name loading';
-      selectEl.innerHTML   = '<option value="">— Laster seksjoner… —</option>';
-      selectEl.disabled    = true;
+// ─── Hent seksjonsdata fra content script ────────────────────────────────────
+function askContentScript(overrideId, attempt) {
+  attempt = attempt || 1;
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+    if (!tab || !/\/users\/\d+\/teacher_activity\/course\/\d+/.test(tab.url || '')) {
+      showNotOnPage(); return;
     }
+    chrome.tabs.sendMessage(tab.id, { type: 'CDS_GET_DATA' }, (response) => {
+      if (chrome.runtime.lastError || !response) {
+        if (attempt < 10) setTimeout(() => askContentScript(overrideId, attempt + 1), 700);
+        else showNotOnPage();
+        return;
+      }
+      renderAutoCard(response.autoSectionId, response.autoSectionName);
+      if (response.sections.length > 0) {
+        populateSections(response.sections, overrideId, response.autoSectionId);
+      } else if (attempt < 10) {
+        setTimeout(() => askContentScript(overrideId, attempt + 1), 700);
+      }
+    });
   });
 }
 
-function applyPopupData(data, overrideId) {
-  sectionsLoaded = true;
-  renderAutoCard(data.autoSectionId, data.autoSectionName, currentColor);
-  populateSections(data.sections || [], overrideId, data.autoSectionId);
+function showNotOnPage() {
+  autoNameEl.textContent = 'Åpne Dialograpport-siden først';
+  autoNameEl.className   = 'auto-name loading';
+  selectEl.innerHTML     = '<option value="">— Åpne Dialograpport-siden først —</option>';
+  selectEl.disabled      = true;
 }
 
-// ─── Auto-kort ────────────────────────────────────────────────────────────────
-function renderAutoCard(sectionId, name, color) {
-  autoDot.style.background   = color;
-  autoCard.style.borderColor = color;
+function renderAutoCard(sectionId, name) {
+  autoDot.style.background   = currentColor;
+  autoCard.style.borderColor = currentColor;
   if (sectionId && name) {
-    autoName.textContent = name;
-    autoName.className   = 'auto-name';
+    autoNameEl.textContent = name;
+    autoNameEl.className   = 'auto-name';
   } else {
-    autoName.textContent = 'Ikke funnet – velg manuelt';
-    autoName.className   = 'auto-name loading';
+    autoNameEl.textContent = 'Ikke funnet – velg manuelt';
+    autoNameEl.className   = 'auto-name loading';
   }
 }
 
-// ─── Seksjonsdropdown ─────────────────────────────────────────────────────────
 function populateSections(sections, overrideId, autoId) {
   selectEl.innerHTML = '';
-  selectEl.disabled  = sections.length === 0;
+  selectEl.disabled  = false;
 
-  if (sections.length === 0) {
-    selectEl.innerHTML = '<option value="">— Ingen seksjoner funnet —</option>';
-    return;
-  }
-
-  const autoOpt = document.createElement('option');
-  autoOpt.value       = '';
-  autoOpt.textContent = '— Min seksjon (automatisk) —';
-  selectEl.appendChild(autoOpt);
+  const blank = document.createElement('option');
+  blank.value       = '';
+  blank.textContent = '— Min seksjon (automatisk) —';
+  selectEl.appendChild(blank);
 
   sections.forEach(sec => {
     const opt = document.createElement('option');
@@ -157,12 +147,16 @@ function updateResetLink() {
   resetBtn.classList.toggle('visible', !!currentOverride);
 }
 
-// ─── Hendelser ────────────────────────────────────────────────────────────────
+// ─── Hendelser ───────────────────────────────────────────────────────────────
 toggleEl.addEventListener('change', () => {
   const enabled = toggleEl.checked;
   toggleText.textContent = enabled ? 'På' : 'Av';
   setBodyEnabled(enabled);
   save({ enabled });
+});
+
+autoSortEl.addEventListener('change', () => {
+  save({ autoSort: autoSortEl.checked });
 });
 
 selectEl.addEventListener('change', () => {
@@ -189,7 +183,6 @@ refreshBtn.addEventListener('click', () => {
   });
 });
 
-// ─── Hjelpere ─────────────────────────────────────────────────────────────────
 function save(changes) { chrome.storage.local.set(changes); }
 
 function setBodyEnabled(enabled) {

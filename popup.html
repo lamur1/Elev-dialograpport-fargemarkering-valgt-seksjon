@@ -86,46 +86,56 @@
     }
     .reset-link.visible { display: inline; }
 
+    /* ─── Alternativ-rad (for autoSort-toggle) ─── */
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #f7f9fb;
+      border-radius: 6px;
+      border: 1px solid #e4e8ec;
+    }
+    .option-row-text { line-height: 1.35; }
+    .option-row-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2d3b45;
+    }
+    .option-row-sub {
+      font-size: 10px;
+      color: #8a95a0;
+      margin-top: 1px;
+    }
+    .option-row input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+
     /* ─── Fargeswatches ─── */
     .swatch-group-label {
-      font-size: 10px;
-      color: #9aa5b1;
-      margin-bottom: 2px;
-      margin-top: 4px;
+      font-size: 10px; color: #9aa5b1;
+      margin-bottom: 2px; margin-top: 4px;
     }
     .swatch-group-label:first-child { margin-top: 0; }
-
     .swatches {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 6px;
     }
-
     .swatch {
-      width: 100%;
-      aspect-ratio: 1;
+      width: 100%; aspect-ratio: 1;
       border-radius: 6px;
       border: 2px solid transparent;
       cursor: pointer;
       transition: transform 0.1s, border-color 0.15s;
       position: relative;
-      /* Outline hjelper de nesten hvite å synes mot bakgrunnen */
       box-shadow: inset 0 0 0 1px rgba(0,0,0,0.07);
     }
     .swatch:hover  { transform: scale(1.13); }
-    .swatch.active {
-      border-color: #2d3b45;
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.07);
-    }
+    .swatch.active { border-color: #2d3b45; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.07); }
     .swatch.active::after {
       content: '✓';
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      color: rgba(0,0,0,0.35);
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: rgba(0,0,0,0.35);
     }
 
     /* ─── Footer ─── */
@@ -176,12 +186,18 @@
       <button class="reset-link" id="reset-override">↩ Tilbake til min seksjon</button>
     </div>
 
+    <div class="option-row">
+      <div class="option-row-text">
+        <div class="option-row-label">Sorter automatisk</div>
+        <div class="option-row-sub">Lengst ventetid øverst ved sidelast</div>
+      </div>
+      <input type="checkbox" id="toggle-autosort" checked />
+    </div>
+
     <div class="field">
       <label>Markeringsfarge</label>
-
       <div class="swatch-group-label">Duse</div>
       <div class="swatches" id="swatches-normal"></div>
-
       <div class="swatch-group-label">Knapt synlig</div>
       <div class="swatches" id="swatches-subtle"></div>
     </div>

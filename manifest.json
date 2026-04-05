@@ -1,14 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Canvas Dialograpport – Seksjonsmarkering",
+  "name": "Canvas Dialograpport \u2013 Seksjonsmarkering",
   "version": "1.0",
   "description": "Markerer elevene i din seksjon med bakgrunnsfarge i Dialograpport-visningen i Canvas.",
-  "permissions": ["storage", "tabs"],
-  "host_permissions": ["*://*.instructure.com/*"],
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.instructure.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["*://*.instructure.com/users/*/teacher_activity/course/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.instructure.com/users/*/teacher_activity/course/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -25,5 +34,15 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "sorter.js"
+      ],
+      "matches": [
+        "*://*.instructure.com/*"
+      ]
+    }
+  ]
 }
